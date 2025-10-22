@@ -25,7 +25,7 @@ pub mod switchboard {
         let btc_usd = (btc_price.price as f64) * 10_f64.powi(btc_price.expo);
         let btc_age = btc_price.publish_time;
 
-        msg!("BTC/USD Price: {:.3}", btc_usd);
+        msg!("BTC/USD: ${:.3}", btc_usd);
         msg!("Last Updated: {} seconds ago ({} hours)", btc_age, btc_age / 3600);
 
         // ----- SOL -----
@@ -39,7 +39,7 @@ pub mod switchboard {
         let sol_usd = (sol_price.price as f64) * 10_f64.powi(sol_price.expo);
         let sol_age = sol_price.publish_time;
 
-        msg!("SOL/USD Price: {:.3}", sol_usd);
+        msg!("SOL/USD: ${:.3}", sol_usd);
         msg!("Last Updated: {} seconds ago ({} hours)", sol_age, sol_age / 3600);
         
         // ----- ETH -----
@@ -53,7 +53,7 @@ pub mod switchboard {
         let eth_usd = (eth_price.price as f64) * 10_f64.powi(eth_price.expo);
         let eth_age = eth_price.publish_time;
 
-        msg!("ETH/USD Price: {:.3}", eth_usd);
+        msg!("ETH/USD: ${:.3}", eth_usd);
         msg!("Last Updated: {} seconds ago ({} hours)", eth_age, eth_age / 3600);
         
         Ok(())
