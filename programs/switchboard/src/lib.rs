@@ -14,19 +14,15 @@ pub mod switchboard {
 
         let btc_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.btc_feed)
             .map_err(|_| error!(ErrorCode::StaleFeed))?;
-        let btc_price = btc_price_feed
-            .get_price_no_older_than(current_timestamp, 60)
-            .ok_or_else(|| error!(ErrorCode::StaleFeed))?;
+        let btc_price = btc_price_feed.get_price_unchecked();
 
         msg!("BTC/USD Price: ${}", btc_price.price);
         msg!("BTC/USD Confidence: ±${}", btc_price.conf);
         msg!("BTC/USD Exponent: ${}", btc_price.expo);
 
-        let sol_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.sol_price_feed)
+        let sol_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.sol_feed)
             .map_err(|_| error!(ErrorCode::StaleFeed))?;
-        let sol_price = sol_price_feed
-            .get_price_no_older_than(current_timestamp, 60)
-            .ok_or_else(||error!(ErrorCode::StaleFeed))?;
+        let sol_price = sol_price_feed.get_price_unchecked();
 
         msg!("SOL/USD Price: ${}", sol_price.price);
         msg!("SOL/USD Confidence: ±${}", sol_price.conf);
@@ -35,9 +31,7 @@ pub mod switchboard {
 
         let eth_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.eth_feed)
             .map_err(|_|error!(ErrorCode::StaleFeed))?;
-        let eth_price = eth_price_feed
-            .get_price_no_older_than(current_timestamp, 60)
-            .ok_or_else(||error!(ErrorCode::StaleFeed))?;
+        let eth_price = eth_price_feed.get_price_unchecked();
 
         msg!("ETH/USD Price: ${}", eth_price.price);
         msg!("ETH/USD Confidence: ±${}", eth_price.conf);
@@ -54,11 +48,12 @@ pub struct GetPrices<'info>{
     pub btc_feed: AccountInfo<'info>,
 
     /// CHECK: SOL price account verified off-chain or by address
-    pub sol_price_feed: AccountInfo<'info>,
+    pub sol_feed: AccountInfo<'info>,
     
     /// CHECK: ETH price account verified off-chain or by address
     pub eth_feed: AccountInfo<'info>,
 
+    pub system_program: Program<'info, System>,
 }
 
 #[error_code]
