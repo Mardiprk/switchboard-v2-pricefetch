@@ -5,7 +5,13 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
+[programs.localnet]
+switchboard = "5NMAuN2UdTN5Qm1RYwUJ6HEGhzGSDeAca1TM2bFcKdqH"
+
 [programs.devnet]
+switchboard = "5NMAuN2UdTN5Qm1RYwUJ6HEGhzGSDeAca1TM2bFcKdqH"
+
+[programs.mainnet]
 switchboard = "5NMAuN2UdTN5Qm1RYwUJ6HEGhzGSDeAca1TM2bFcKdqH"
 
 [registry]

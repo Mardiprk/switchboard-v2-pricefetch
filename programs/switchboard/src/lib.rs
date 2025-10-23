@@ -59,57 +59,49 @@ pub mod switchboard {
         Ok(())
     }
 
-    // pub fn get_prices_with_validation(ctx: Context<GetPrices>) -> Result<()> {
-    //     let clock = Clock::get()?;
-    //     let current_timestamp = clock.unix_timestamp;
-    //     let max_age = 300; // 5 minutes for devnet
+    // Production version with staleness check (use on mainnet)
+    pub fn get_prices_with_validation(ctx: Context<GetPrices>) -> Result<()> {
+        let clock = Clock::get()?;
+        let current_timestamp = clock.unix_timestamp;
+        let max_age = 60; 
 
-    //     msg!("Current timestamp: {}", current_timestamp);
+        msg!("Current Timestamp: {}", current_timestamp);
 
-    //     // ----- BTC -----
-    //     let btc_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.btc_feed)
-    //         .map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
+        // ----- BTC -----
+        let btc_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.btc_feed).map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
+        let btc_price = btc_price_feed.get_price_no_older_than(current_timestamp, max_age).ok_or_else(|| {
+            msg!("BTC price is stale. Max age: {}s", max_age);
+            error!(ErrorCode::StaleFeed)
+        })?;
+
+        let btc_normalized = (btc_price.price as f64) * 10_f64.powi(btc_price.expo);
+
+        msg!("BTC/USD: ${:.2}", btc_normalized);
+
+        // ----- SOL -----
+        let sol_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.sol_feed).map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
+        let sol_price = sol_price_feed.get_price_no_older_than(current_timestamp, max_age).ok_or_else(|| {
+            msg!("SOL price is stale. Max age: {}s", max_age);
+            error!(ErrorCode::StaleFeed)
+        })?;
+        let sol_normalized = (sol_price.price as f64) * 10_f64.powi(sol_price.expo);
+
+        msg!("SOL/USD {:.2}", sol_normalized);
         
-    //     let btc_price = btc_price_feed
-    //         .get_price_no_older_than(current_timestamp, max_age)
-    //         .ok_or_else(|| {
-    //             msg!("BTC price is stale. Max age: {}s", max_age);
-    //             error!(ErrorCode::StaleFeed)
-    //         })?;
-
-    //     let btc_normalized = (btc_price.price as f64) * 10_f64.powi(btc_price.expo);
-    //     msg!("BTC/USD: ${:.2}", btc_normalized);
-
-    //     // ----- SOL -----
-    //     let sol_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.sol_feed)
-    //         .map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
+        // ----- ETH -----
+        let eth_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.eth_feed).map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
+        let eth_price = eth_price_feed.get_price_no_older_than(current_timestamp, max_age).ok_or_else(||{
+            msg!("ETH price is stale, Max age: {}s", max_age);
+            error!(ErrorCode::StaleFeed)
+        })?;
         
-    //     let sol_price = sol_price_feed
-    //         .get_price_no_older_than(current_timestamp, max_age)
-    //         .ok_or_else(|| {
-    //             msg!("SOL price is stale. Max age: {}s", max_age);
-    //             error!(ErrorCode::StaleFeed)
-    //         })?;
-
-    //     let sol_normalized = (sol_price.price as f64) * 10_f64.powi(sol_price.expo);
-    //     msg!("SOL/USD: ${:.2}", sol_normalized);
-
-    //     // ----- ETH -----
-    //     let eth_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.eth_feed)
-    //         .map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
+        let eth_normalized = (eth_price.price as f64) * 10_f64.powi(eth_price.expo);
         
-    //     let eth_price = eth_price_feed
-    //         .get_price_no_older_than(current_timestamp, max_age)
-    //         .ok_or_else(|| {
-    //             msg!("ETH price is stale. Max age: {}s", max_age);
-    //             error!(ErrorCode::StaleFeed)
-    //         })?;
+        msg!("ETH/USD ${:.2}", eth_normalized);
 
-    //     let eth_normalized = (eth_price.price as f64) * 10_f64.powi(eth_price.expo);
-    //     msg!("ETH/USD: ${:.2}", eth_normalized);
+        Ok(())
+    }
 
-    //     Ok(())
-    // }
 }
 
 #[derive(Accounts)]
