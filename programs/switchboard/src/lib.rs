@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
-use pyth_sdk_solana::state::SolanaPriceAccount;
+use switchboard_v2::AggregatorAccountData;
+use std::convert::TryInto;
 
 declare_id!("5NMAuN2UdTN5Qm1RYwUJ6HEGhzGSDeAca1TM2bFcKdqH");
 
@@ -14,90 +15,64 @@ pub mod switchboard {
         msg!("Current timestamp: {}", current_timestamp);
 
         // ----- BTC -----
-        let btc_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.btc_feed)
-            .map_err(|e| {
-                msg!("Error loading BTC feed: {:?}", e);
-                error!(ErrorCode::InvalidPriceFeed)
-            })?;
-        
-        // Use get_price_unchecked for devnet (feeds may not update frequently)
-        let btc_price = btc_price_feed.get_price_unchecked();
-        let btc_usd = (btc_price.price as f64) * 10_f64.powi(btc_price.expo);
-        let btc_age = btc_price.publish_time;
+        let btc_feed = &mut ctx.accounts.btc_feed;
+        let btc_result = parse_switchboard_feed(&btc_feed)?;
+        let btc_age = current_timestamp - btc_result.timestamp;
 
-        msg!("BTC/USD: ${:.3}", btc_usd);
-        msg!("Last Updated: {} seconds ago ({} hours)", btc_age, btc_age / 3600);
+        msg!("BTC/USD ${:.2}", btc_result.price);
+        msg!("Last Updated: {} seconds ago ({:.2}) hours", btc_age, btc_age as f64 / 3600.0);
 
-        // ----- SOL -----
-        let sol_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.sol_feed)
-            .map_err(|e| {
-                msg!("Error loading SOL feed: {:?}", e);
-                error!(ErrorCode::InvalidPriceFeed)
-            })?;
-        
-        let sol_price = sol_price_feed.get_price_unchecked();
-        let sol_usd = (sol_price.price as f64) * 10_f64.powi(sol_price.expo);
-        let sol_age = sol_price.publish_time;
+        // ----- SOl -----
+        let sol_feed = &mut ctx.accounts.sol_feed;
+        let sol_result = parse_switchboard_feed(&sol_feed)?;
+        let sol_age = current_timestamp - sol_result.timestamp;
 
-        msg!("SOL/USD: ${:.3}", sol_usd);
-        msg!("Last Updated: {} seconds ago ({} hours)", sol_age, sol_age / 3600);
-        
-        // ----- ETH -----
-        let eth_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.eth_feed)
-            .map_err(|e| {
-                msg!("Error loading ETH feed: {:?}", e);
-                error!(ErrorCode::InvalidPriceFeed)
-            })?;
-        
-        let eth_price = eth_price_feed.get_price_unchecked();
-        let eth_usd = (eth_price.price as f64) * 10_f64.powi(eth_price.expo);
-        let eth_age = eth_price.publish_time;
+        msg!("SOL/USD ${:.2}", sol_result.price);
+        msg!("Last Updated: {} seconds ago ({:.2}) hours", sol_age, sol_age as f64 / 3600.0);
 
-        msg!("ETH/USD: ${:.3}", eth_usd);
-        msg!("Last Updated: {} seconds ago ({} hours)", eth_age, eth_age / 3600);
-        
+        // ----- ETh -----
+        let eth_feed = &mut ctx.accounts.eth_feed;
+        let eth_result = parse_switchboard_feed(&eth_feed)?;
+        let eth_age = current_timestamp - eth_result.timestamp;
+
+        msg!("ETH/USD ${:.2}", eth_result.price);
+        msg!("Last Updated: {} seconds ago ({:.2}) hours", eth_age, eth_age as f64 / 3600.0);
+
         Ok(())
     }
-
-    // Production version with staleness check (use on mainnet)
     pub fn get_prices_with_validation(ctx: Context<GetPrices>) -> Result<()> {
         let clock = Clock::get()?;
         let current_timestamp = clock.unix_timestamp;
-        let max_age = 60; 
+        let max_staleness: i64 = 300; // 5 minutes
 
         msg!("Current Timestamp: {}", current_timestamp);
 
         // ----- BTC -----
-        let btc_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.btc_feed).map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
-        let btc_price = btc_price_feed.get_price_no_older_than(current_timestamp, max_age).ok_or_else(|| {
-            msg!("BTC price is stale. Max age: {}s", max_age);
-            error!(ErrorCode::StaleFeed)
-        })?;
+        let btc_feed = parse_switchboard_feed(&mut ctx.accounts.btc_feed)?;
+        let btc_age = current_timestamp - btc_feed.timestamp;
 
-        let btc_normalized = (btc_price.price as f64) * 10_f64.powi(btc_price.expo);
+        require!(btc_age <= max_staleness, ErrorCode::StaleFeed);
 
-        msg!("BTC/USD: ${:.2}", btc_normalized);
+        msg!("BTC/USD: ${:.2}", btc_feed.price);
+        msg!("Age: {}s", btc_age);
 
         // ----- SOL -----
-        let sol_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.sol_feed).map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
-        let sol_price = sol_price_feed.get_price_no_older_than(current_timestamp, max_age).ok_or_else(|| {
-            msg!("SOL price is stale. Max age: {}s", max_age);
-            error!(ErrorCode::StaleFeed)
-        })?;
-        let sol_normalized = (sol_price.price as f64) * 10_f64.powi(sol_price.expo);
+        let sol_feed = parse_switchboard_feed(&mut ctx.accounts.sol_feed)?;
+        let sol_age = current_timestamp - sol_feed.timestamp;
 
-        msg!("SOL/USD {:.2}", sol_normalized);
-        
+        require!(sol_age <= max_staleness, ErrorCode::StaleFeed );
+
+        msg!("SOL/USD: ${:.2}", sol_feed.price);
+        msg!("Age: {}s", sol_age);
+
         // ----- ETH -----
-        let eth_price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.eth_feed).map_err(|_| error!(ErrorCode::InvalidPriceFeed))?;
-        let eth_price = eth_price_feed.get_price_no_older_than(current_timestamp, max_age).ok_or_else(||{
-            msg!("ETH price is stale, Max age: {}s", max_age);
-            error!(ErrorCode::StaleFeed)
-        })?;
-        
-        let eth_normalized = (eth_price.price as f64) * 10_f64.powi(eth_price.expo);
-        
-        msg!("ETH/USD ${:.2}", eth_normalized);
+        let eth_feed = parse_switchboard_feed(&mut ctx.accounts.eth_feed)?;
+        let eth_age = current_timestamp - eth_feed.timestamp;
+
+        require!(eth_age <= max_staleness, ErrorCode::StaleFeed);
+
+        msg!("ETH/USD: ${:.2}", eth_feed.price);
+        msg!("Age: {}s", eth_age);
 
         Ok(())
     }
@@ -106,16 +81,14 @@ pub mod switchboard {
 
 #[derive(Accounts)]
 pub struct GetPrices<'info> {
-    /// CHECK: BTC price account verified by Pyth SDK
+    /// CHECK: Switchboard V2 BTC/USD
     pub btc_feed: AccountInfo<'info>,
 
-    /// CHECK: SOL price account verified by Pyth SDK
+    /// CHECK: Switchboard V2 SOL/USD
     pub sol_feed: AccountInfo<'info>,
 
-    /// CHECK: ETH price account verified by Pyth SDK
+    /// CHECK: Switchboard V2 ETH/USD
     pub eth_feed: AccountInfo<'info>,
-
-    
 }
 
 #[error_code]
@@ -124,4 +97,39 @@ pub enum ErrorCode {
     StaleFeed,
     #[msg("Invalid Price Feed Account")]
     InvalidPriceFeed,
+    #[msg("Failed to parse price feed")]
+    ParseError,
+}
+
+struct FeedResult{
+    price: f64,
+    timestamp: i64
+}
+
+fn parse_switchboard_feed(account_info: &AccountInfo) -> Result<FeedResult> {
+    let data = account_info.try_borrow_data().map_err(|_| ErrorCode::ParseError)?;
+    
+    if data.len() < 237 {
+        return Err(ErrorCode::InvalidPriceFeed.into());
+    }
+
+    let result_bytes: [u8; 16] = data[217..233]
+        .try_into()
+        .map_err(|_| ErrorCode::ParseError)?;
+    let mantissa = i128::from_le_bytes(result_bytes);
+
+    let scale_bytes: [u8; 4] = data[233..237]
+        .try_into()
+        .map_err(|_| ErrorCode::ParseError)?;
+    let scale = u32::from_le_bytes(scale_bytes);
+
+    let timestamp_bytes: [u8; 8] = data[229..237]
+        .try_into()
+        .map_err(|_| ErrorCode::ParseError)?;
+    let timestamp = i64::from_le_bytes(timestamp_bytes);
+
+    // Calculate price
+    let price = mantissa as f64 / 10_f64.powi(scale as i32);
+
+    Ok(FeedResult { price, timestamp })
 }

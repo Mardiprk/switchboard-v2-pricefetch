@@ -9,11 +9,13 @@ describe("switchboard", () => {
 
   const program = anchor.workspace.Switchboard as Program<Switchboard>;
 
-  const BTC_FEED = new PublicKey("HovQMDrbAgAYPCmHVSrezcSmkMtXSSUsLDFANExrZh2J");
-  const SOL_FEED = new PublicKey("J83w4HKfqxwcq3BEMMkPFSppX3gqekLyLJBexebFVkix");
-  const ETH_FEED = new PublicKey("EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw");
+  // Switchboard V2 Devnet Aggregator Feeds
+  const BTC_FEED = new PublicKey("8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee");
+  const SOL_FEED = new PublicKey("GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR");
+  const ETH_FEED = new PublicKey("JBu1AL4obBcCMqKBBxhpWCNUt136ijcuMZLFvTP7iWdB");
+
   
-  it("☑️ Fetching BTC, SOL, ETH Prices from Pyth (Devnet)", async () => {
+  it("☑️ Fetching BTC, SOL, ETH Prices from Switchboard V2", async () => {
     try {
       const tx = await program.methods.getPrices().accounts({
         btcFeed: BTC_FEED,
@@ -21,7 +23,7 @@ describe("switchboard", () => {
         ethFeed: ETH_FEED,
       }).rpc();
 
-      console.log("✅ Transaction Signature:", tx);
+      console.log(`✔️ Transaction Signature: https://solana.fm/address/${tx}/transactions?cluster=devnet-alpha`);
 
       await provider.connection.confirmTransaction(tx, "confirmed");
 
@@ -30,14 +32,14 @@ describe("switchboard", () => {
         commitment: "confirmed",
       });
 
-      console.log("\n💰 Price Data:");
+      console.log("\n> Price Data:");
       console.log("=".repeat(60));
       txDetails?.meta?.logMessages?.forEach((log) => {
         console.log(log);
       });
       console.log("=".repeat(60));
     } catch (error) {
-      console.error("❌ Error:", error);
+      console.error("Error:", error);
       throw error;
     }
   });
